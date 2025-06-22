@@ -58,19 +58,15 @@ WebServer server(SERVER_PORT);
 ESP8266WebServer server(SERVER_PORT);
 #endif
 
-
 void handleSetServo() {
   if (server.hasArg("id") && server.hasArg("angle")) {
     int id = server.arg("id").toInt();
     int position = server.arg("angle").toInt();
 
     // Validate parameters
-    if (id >= 0 && id < 16 && position >= SERVO_ANGLE_MIN &&
-        position <= SERVO_ANGLE_MAX) {
+    if (id >= 0 && id < 16 && position >= SERVO_MIN && position <= SERVO_MAX) {
       servoPositions[id] = position;
-      board1.setPWM(
-          id, 0,
-          get_pulse(position));
+      board1.setPWM(id, 0, position);
       String response =
           "Updated servo " + String(id) + " to position " + String(position);
       server.send(200, "text/plain", response);
@@ -87,7 +83,6 @@ void setup() {
   board1.begin();
   board1.setPWMFreq(SERVO_FREQ);
 
-  
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
@@ -98,10 +93,7 @@ void setup() {
 
   // Initialize all servos to their initial positions
   for (int i = 0; i < 16; i++) {
-    board1.setPWM(
-        i, 0,
-        get_pulse(
-            servoPositions[i])); 
+    board1.setPWM(i, 0, get_pulse(servoPositions[i]));
   }
 
   server.on("/setServo", handleSetServo);
@@ -111,5 +103,5 @@ void setup() {
 
 void loop() {
   server.handleClient();
-  delay(10);            
+  delay(10);
 }
