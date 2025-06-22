@@ -1,11 +1,21 @@
 #include <Adafruit_PWMServoDriver.h>
 #include <Arduino.h>
+#if defined(ESP32)
 #include <WebServer.h>
+#elif defined(ESP8266)
+#include <ESP8266WebServer.h>
+#endif
+#if defined(ESP32)
 #include <WiFi.h>
+#endif
+#if defined(ESP8266)
+#include <ESP8266WiFi.h>
+#endif
+
 #include <initial-positions.h>
 
-const char *ssid = "abcd";
-const char *password = "12345678";
+const char *ssid = "jioairfiber";
+const char *password = "7559016538";
 
 // MG995 servo specifications:
 // - Operating angle: 0° to 180°
@@ -30,61 +40,23 @@ uint16_t get_pulse(uint8_t _angle) {
   return _pulse;
 }
 
-
-
 int servoPositions[16] = {
-    LA1_INITIAL_POSITION,  LA2_INITIAL_POSITION,  LA3_INITIAL_POSITION,
-    RA1_INITIAL_POSITION,  RA2_INITIAL_POSITION , RA3_INITIAL_POSITION,
-    LH_INITIAL_POSITION,   RH_INITIAL_POSITION,   LL1_INITIAL_POSITION,
+    LA1_INITIAL_POSITION, LA2_INITIAL_POSITION, LA3_INITIAL_POSITION,
+    RA1_INITIAL_POSITION, RA2_INITIAL_POSITION, RA3_INITIAL_POSITION,
+    LH_INITIAL_POSITION,  RH_INITIAL_POSITION,  LL1_INITIAL_POSITION,
     LL2_INITIAL_POSITION, LL3_INITIAL_POSITION, RL1_INITIAL_POSITION,
     RL2_INITIAL_POSITION, RL3_INITIAL_POSITION, LF_INITIAL_POSITION,
-    RF_INITIAL_POSITION, 
+    RF_INITIAL_POSITION,
 };
 
 Adafruit_PWMServoDriver board1 = Adafruit_PWMServoDriver(
     CONTROLLER_I2C_ADDR); // called this way, it uses the default address 0x40
 
+#if defined(ESP32)
 WebServer server(SERVER_PORT);
-
-// HTML content for the web interface
-const char *htmlPage = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Servo Position Control</title>
-    <style>
-        .slider-container { margin: 10px 0; }
-    </style>
-    <script>
-        function updateServo(id, value) {
-            document.getElementById('position' + id).innerText = value;
-            fetch(`/setServo?id=${id}&angle=${value}`);
-        }
-    </script>
-</head>
-<body>  
-    <h1>Servo Position Control</h1>
-)rawliteral";
-
-const char *htmlSliders = R"rawliteral(
-    <div class="slider-container">
-        LA%d: <input type="range" min="0" max="180" value="%d" id="slider%d" 
-        oninput="updateServo(%d, this.value)">
-        <span>Position: <span id="position%d">%d</span></span>
-    </div>
-)rawliteral";
-
-void handleRoot() {
-  String html = htmlPage;
-  char sliderHtml[1000];
-  for (int i = 0; i < 16; i++) {
-    sprintf(sliderHtml, htmlSliders, i + 1, servoPositions[i], i, i, i,
-            servoPositions[i]);
-    html += sliderHtml;
-  }
-  html += "</body></html>";
-  server.send(200, "text/html", html);
-}
+#elif defined(ESP8266)
+ESP8266WebServer server(SERVER_PORT);
+#endif
 
 void handleSetServo() {
   if (server.hasArg("id") && server.hasArg("angle")) {
@@ -92,12 +64,9 @@ void handleSetServo() {
     int position = server.arg("angle").toInt();
 
     // Validate parameters
-    if (id >= 0 && id < 16 && position >= SERVO_ANGLE_MIN &&
-        position <= SERVO_ANGLE_MAX) {
+    if (id >= 0 && id < 16 && position >= SERVO_MIN && position <= SERVO_MAX) {
       servoPositions[id] = position;
-      board1.setPWM(
-          id, 0,
-          get_pulse(position)); // Fix: Use get_pulse instead of raw position
+      board1.setPWM(id, 0, position);
       String response =
           "Updated servo " + String(id) + " to position " + String(position);
       server.send(200, "text/plain", response);
@@ -114,7 +83,6 @@ void setup() {
   board1.begin();
   board1.setPWMFreq(SERVO_FREQ);
 
-  // Connect to WiFi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
@@ -125,19 +93,15 @@ void setup() {
 
   // Initialize all servos to their initial positions
   for (int i = 0; i < 16; i++) {
-    board1.setPWM(
-        i, 0,
-        get_pulse(
-            servoPositions[i])); // Fix: Use get_pulse instead of angleToPulse
+    board1.setPWM(i, 0, get_pulse(servoPositions[i]));
   }
 
-  server.on("/", handleRoot);
   server.on("/setServo", handleSetServo);
   server.begin();
   Serial.println("Web server started");
 }
 
 void loop() {
-  server.handleClient(); // Handle client requests
-  delay(10); // Small delay to avoid blocking
+  server.handleClient();
+  delay(10);
 }
