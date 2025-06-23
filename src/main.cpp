@@ -66,6 +66,7 @@ void handleSetServo() {
     // Validate parameters
     if (id >= 0 && id < 16 && position >= SERVO_MIN && position <= SERVO_MAX) {
       servoPositions[id] = position;
+      Serial.println("Updateing " + String(id) + " to " + String(position));
       board1.setPWM(id, 0, position);
       String response =
           "Updated servo " + String(id) + " to position " + String(position);
